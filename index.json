@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>Yılbaşı Heads Up - Pro Yönetim</title>
+    <style>
+        :root { --green: #2ecc71; --red: #e74c3c; --blue: #3498db; --dark: #121212; --panel: #1e1e1e; }
+        body { margin: 0; background-color: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; text-align: center; }
+        .screen { display: none; flex-direction: column; justify-content: center; align-items: center; height: 100vh; width: 100vw; padding: 20px; box-sizing: border-box; }
+        .active { display: flex; }
+        
+        input, select, textarea { padding: 12px; margin: 10px; border-radius: 8px; border: none; background: #333; color: white; width: 90%; max-width: 400px; font-size: 1rem; }
+        textarea { resize: none; font-family: inherit; }
+        .btn { padding: 15px 30px; border: none; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; margin: 5px; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.95); }
+        .btn-main { background: var(--blue); width: 220px; }
+        .btn-deck { background: #555; min-width: 100px; font-size: 0.8rem; border: 2px solid transparent; margin: 3px; }
+        .selected-deck { border-color: var(--blue); background: #444; }
+        
+        #deck-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; max-height: 200px; overflow-y: auto; width: 100%; }
+        #scoreboard { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: center; background: rgba(0,0,0,0.5); padding: 5px 0; gap: 10px; z-index: 5; font-size: 0.8rem; }
+        .team-score-box { background: #333; padding: 4px 10px; border-radius: 10px; border-bottom: 3px solid transparent; }
+        .active-team-box { border-bottom-color: var(--blue); background: #444; transform: scale(1.1); }
+
+        #word { font-size: clamp(1.8rem, 8vw, 4rem); font-weight: 900; margin: 20px 0; text-transform: uppercase; word-wrap: break-word; max-width: 90%; line-height: 1.2; }
+        .game-header { position: absolute; top: 40px; width: 95%; display: flex; justify-content: space-between; align-items: center; }
+        
+        .game-controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 40px; }
+        .control-btn { width: 65px; height: 65px; border-radius: 50%; border: none; color: white; font-size: 1.8rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; }
+        .btn-pass { background: var(--red); }
+        .btn-check { background: var(--green); }
+        
+        #settings-overlay, #admin-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100; flex-direction:column; justify-content:center; align-items:center; overflow-y: auto; padding: 20px; box-sizing: border-box; }
+        
+        #admin-list-container { width: 100%; max-width: 400px; max-height: 150px; overflow-y: auto; background: #222; border-radius: 10px; margin-bottom: 15px; }
+        .admin-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #333; cursor: pointer; text-align: left; }
+        .admin-list-item:hover { background: #2c2c2c; }
+        .admin-list-item.editing { border-left: 4px solid var(--blue); background: #2c2c2c; }
+        .admin-list-item span:first-child { font-weight: bold; color: var(--blue); }
+
+        .flash-correct { background-color: var(--green) !important; }
+        .flash-wrong { background-color: var(--red) !important; }
+    </style>
+</head>
+<body>
+
+    <div id="scoreboard" style="display: none;"></div>
+
+    <div id="setup-1" class="screen active">
+        <h1>🎄 ULTIMATE HEADS UP</h1>
+        <div id="deck-container">Yükleniyor...</div>
+        <button onclick="window.toggleAdmin(true)" style="background:none; border:none; color:var(--blue); font-size:0.9rem; cursor:pointer; margin-bottom:10px; text-decoration: underline;">⚙️ Deckleri Yönet (Ekle/Sil/Düzenle)</button>
+        
+        <label>Takım Sayısı:</label>
+        <input type="number" id="team-count" value="2" min="2" max="6">
+        <label>Round Sayısı:</label>
+        <input type="number" id="round-count" value="3" min="1">
+        <button class="btn btn-main" onclick="window.goToNames()">İLERLE</button>
+    </div>
+
+    <div id="admin-overlay">
+        <h2 style="margin-top: 0;">DECK YÖNETİMİ</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 5px;">Düzenlemek için listeden seçin:</p>
+        <div id="admin-list-container"></div>
+
+        <input type="text" id="new-deck-name" placeholder="Deck Adı (Örn: Sinema)" oninput="window.checkExistingDeck(this.value)">
+        <textarea id="new-deck-words" rows="6" placeholder="Kelimeleri buraya yazın... (Virgül veya yeni satır kullanabilirsiniz)"></textarea>
+        
+        <div style="display: flex; gap: 10px; width: 90%; max-width: 400px;">
+            <button class="btn" style="background: var(--green); flex: 1;" onclick="window.saveDeck()">KAYDET / GÜNCELLE</button>
+            <button class="btn" style="background: var(--red); flex: 1;" onclick="window.deleteDeck()">SİL</button>
+        </div>
+        <button class="btn" style="background: #444; width: 200px;" onclick="window.toggleAdmin(false)">KAPAT</button>
+    </div>
+
+    <div id="setup-2" class="screen">
+        <h1>👥 TAKIM İSİMLERİ</h1>
+        <div id="name-inputs" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+        <button class="btn btn-main" onclick="window.initTournament()">BAŞLAT</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="game-header">
+            <div id="current-info">Takım 1 | R: 1</div>
+            <div id="timer" style="font-size: 2rem; font-weight: bold; color: var(--blue);">60</div>
+            <button onclick="window.toggleSettings(true)" style="background:none; border:none; color:white; font-size:1.5rem; cursor: pointer;">⚙️</button>
+        </div>
+        <div id="word">DOKUN VE BAŞLA</div>
+        <div class="game-controls">
+            <button class="control-btn btn-pass" onclick="window.processResult('wrong')">✖</button>
+            <button class="control-btn btn-check" onclick="window.processResult('correct')">✔</button>
+        </div>
+    </div>
+
+    <div id="settings-overlay">
+        <h2>DURAKLATILDI</h2>
+        <button class="btn btn-main" onclick="window.toggleSettings(false)">DEVAM ET</button>
+        <button class="btn" style="background: var(--red);" onclick="location.reload()">ANA SAYFAYA DÖN</button>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <h1>🏆 TURNUVA SONUÇLARI</h1>
+        <div id="final-stats" style="font-size: 1.5rem; margin-bottom: 20px;"></div>
+        <button class="btn btn-main" onclick="location.reload()">YENİ TURNUVA</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TODO: Replace with your own Firebase configuration
+        // Get your config from Firebase Console > Project Settings > Your Apps
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "YOUR_MEASUREMENT_ID"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let decks = {};
+        let selectedDeckKey = '';
+        let tournament = { teams: [], currentTeamIdx: 0, currentRound: 1, maxRounds: 1 };
+        let gameActive = false;
+        let timeLeft = 60;
+        let wordList = [];
+        let wordIdx = 0;
+        let timerInterval;
+        let lastGamma = 0;
+
+        async function loadData() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "decks"));
+                decks = {};
+                querySnapshot.forEach((doc) => {
+                    decks[doc.id] = doc.data().words;
+                });
+                renderDeckButtons();
+                renderAdminDeckList();
+            } catch (error) {
+                console.error("Yükleme Hatası:", error);
+            }
+        }
+
+        // Listede bir öğeye tıklandığında inputları doldur
+        window.editDeck = (key) => {
+            document.getElementById('new-deck-name').value = key;
+            document.getElementById('new-deck-words').value = decks[key].join('\n');
+            
+            // UI üzerinde hangi öğenin seçili olduğunu göster
+            document.querySelectorAll('.admin-list-item').forEach(el => el.classList.remove('editing'));
+            event.currentTarget.classList.add('editing');
+        };
+
+        // Manuel isim yazılırken kontrol et
+        window.checkExistingDeck = (val) => {
+            const trimmedVal = val.trim();
+            if (decks[trimmedVal]) {
+                document.getElementById('new-deck-words').value = decks[trimmedVal].join('\n');
+            }
+        };
+
+        function renderDeckButtons() {
+            const container = document.getElementById('deck-container');
+            container.innerHTML = '';
+            Object.keys(decks).forEach(key => {
+                const btn = document.createElement('button');
+                btn.className = `btn btn-deck ${selectedDeckKey === key ? 'selected-deck' : ''}`;
+                btn.innerText = key.toUpperCase();
+                btn.onclick = () => window.selectDeck(key);
+                container.appendChild(btn);
+            });
+            if(!selectedDeckKey && Object.keys(decks).length > 0) {
+                window.selectDeck(Object.keys(decks)[0]);
+            }
+        }
+
+        function renderAdminDeckList() {
+            const listContainer = document.getElementById('admin-list-container');
+            listContainer.innerHTML = '';
+            Object.keys(decks).forEach(key => {
+                const item = document.createElement('div');
+                item.className = 'admin-list-item';
+                item.innerHTML = `<span>${key}</span> <span>${decks[key].length} Kelime</span>`;
+                item.onclick = () => window.editDeck(key);
+                listContainer.appendChild(item);
+            });
+        }
+
+        window.saveDeck = async () => {
+            const name = document.getElementById('new-deck-name').value.trim();
+            const wordsRaw = document.getElementById('new-deck-words').value;
+            if(!name) return alert("Deck adı boş olamaz!");
+            
+            const wordArr = wordsRaw.split(/[\n,]+/).map(w => w.trim()).filter(w => w !== "");
+            if(wordArr.length === 0) return alert("Lütfen en az bir kelime yazın!");
+
+            try {
+                await setDoc(doc(db, "decks", name), { words: wordArr });
+                alert("Başarıyla Kaydedildi!");
+                // Temizlik yapma, kullanıcı belki başka bir ekleme daha yapar
+                await loadData(); 
+            } catch (error) {
+                alert("Hata: " + error.message);
+            }
+        };
+
+        window.deleteDeck = async () => {
+            const name = document.getElementById('new-deck-name').value.trim();
+            if(!name || !decks[name]) return alert("Silmek için listeden bir deck seçin!");
+            
+            if(confirm(`'${name}' listesini kalıcı olarak silmek istiyor musunuz?`)) {
+                try {
+                    await deleteDoc(doc(db, "decks", name));
+                    document.getElementById('new-deck-name').value = "";
+                    document.getElementById('new-deck-words').value = "";
+                    await loadData();
+                    alert("Silindi.");
+                } catch (error) {
+                    alert("Hata: " + error.message);
+                }
+            }
+        };
+
+        // --- OYUN FONKSİYONLARI (DEĞİŞMEDİ) ---
+        window.toggleAdmin = (s) => document.getElementById('admin-overlay').style.display = s ? 'flex' : 'none';
+        window.toggleSettings = (s) => { gameActive = !s; document.getElementById('settings-overlay').style.display = s ? 'flex' : 'none'; };
+        window.selectDeck = (key) => { selectedDeckKey = key; renderDeckButtons(); };
+        window.goToNames = () => {
+            if(!selectedDeckKey) return alert("Lütfen bir Deck seçin!");
+            const count = document.getElementById('team-count').value;
+            tournament.maxRounds = document.getElementById('round-count').value;
+            let html = '';
+            for(let i=1; i<=count; i++) html += `<input type="text" id="t-name-${i}" value="Takım ${i}">`;
+            document.getElementById('name-inputs').innerHTML = html;
+            switchScreen('setup-1', 'setup-2');
+        };
+        window.initTournament = () => {
+            const count = document.getElementById('team-count').value;
+            tournament.teams = [];
+            for(let i=1; i<=count; i++) tournament.teams.push({ name: document.getElementById(`t-name-${i}`).value, score: 0 });
+            document.getElementById('scoreboard').style.display = 'flex';
+            switchScreen('setup-2', 'game-screen');
+            prepareTurn();
+        };
+        function updateScoreboard() {
+            let html = '';
+            tournament.teams.forEach((t, i) => {
+                const cls = (i === tournament.currentTeamIdx) ? 'active-team-box' : '';
+                html += `<div class="team-score-box ${cls}">${t.name}: <strong>${t.score}</strong></div>`;
+            });
+            document.getElementById('scoreboard').innerHTML = html;
+        }
+        function prepareTurn() {
+            gameActive = false; wordIdx = 0; timeLeft = 60;
+            wordList = [...decks[selectedDeckKey]].sort(() => Math.random() - 0.5);
+            const team = tournament.teams[tournament.currentTeamIdx];
+            document.getElementById('current-info').innerText = `${team.name} | R: ${tournament.currentRound}/${tournament.maxRounds}`;
+            document.getElementById('word').innerText = "DOKUN VE BAŞLA";
+            document.getElementById('timer').innerText = "60";
+            updateScoreboard();
+            const startHandler = () => {
+                if(!gameActive && document.getElementById('game-screen').classList.contains('active')) {
+                    document.body.removeEventListener('click', startHandler);
+                    startTurn();
+                }
+            };
+            document.body.addEventListener('click', startHandler);
+        }
+        function startTurn() {
+            gameActive = true;
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission();
+            window.addEventListener('deviceorientation', handleMotion);
+            showWord();
+            timerInterval = setInterval(() => {
+                if(!gameActive) return;
+                timeLeft--; document.getElementById('timer').innerText = timeLeft;
+                if(timeLeft <= 0) endTurn();
+            }, 1000);
+        }
+        function showWord() { document.getElementById('word').innerText = wordList[wordIdx % wordList.length]; }
+        window.processResult = (type) => {
+            if(!gameActive) return;
+            const team = tournament.teams[tournament.currentTeamIdx];
+            if(type === 'correct') { team.score++; flash('flash-correct'); }
+            else { team.score--; flash('flash-wrong'); }
+            updateScoreboard(); wordIdx++; showWord();
+        };
+        function handleMotion(event) {
+            if(!gameActive) return;
+            let g = event.gamma;
+            if (g < 30 && lastGamma >= 30) window.processResult('correct');
+            else if (g > 150 && lastGamma <= 150) window.processResult('wrong');
+            lastGamma = g;
+        }
+        function endTurn() {
+            gameActive = false; clearInterval(timerInterval);
+            window.removeEventListener('deviceorientation', handleMotion);
+            tournament.currentTeamIdx++;
+            if(tournament.currentTeamIdx >= tournament.teams.length) { tournament.currentTeamIdx = 0; tournament.currentRound++; }
+            if(tournament.currentRound > tournament.maxRounds) showResults();
+            else { alert("Süre Doldu! Sıradaki takıma geçiliyor."); prepareTurn(); }
+        }
+        function showResults() {
+            document.getElementById('scoreboard').style.display = 'none';
+            switchScreen('game-screen', 'result-screen');
+            let html = '';
+            [...tournament.teams].sort((a,b) => b.score - a.score).forEach(t => {
+                html += `<p>${t.name}: <strong>${t.score} Puan</strong></p>`;
+            });
+            document.getElementById('final-stats').innerHTML = html;
+        }
+        function flash(cls) { document.body.classList.add(cls); setTimeout(() => document.body.classList.remove(cls), 300); }
+        function switchScreen(from, to) { document.getElementById(from).classList.remove('active'); document.getElementById(to).classList.add('active'); }
+
+        loadData();
+    </script>
+</body>
+</html>
